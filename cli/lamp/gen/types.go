@@ -35,6 +35,10 @@ var CodeGenerators = []types.GeneratorItem{
 		Generator: code.NewDemoService(svcCtx),
 	},
 	{
+		Dir:       "/internal/svc",
+		Generator: code.NewSvcContext(svcCtx),
+	},
+	{
 		Dir:       "/",
 		Generator: code.NewMod(svcCtx),
 	},

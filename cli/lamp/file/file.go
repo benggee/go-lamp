@@ -23,7 +23,7 @@ func (f *File) Execute(g *types.GeneratorContext) error {
 	}
 
 	for k, v := range g.ReplaceMap {
-		g.Template = strings.Replace(g.Template, k, v, 1)
+		g.Template = strings.ReplaceAll(g.Template, k, v)
 	}
 
 	ret, err := format.Source([]byte(g.Template))

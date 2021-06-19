@@ -21,7 +21,7 @@ func RegisterRoute(serve *httpz.Serve, ctx *svc.SvcContext) {
 	serve.AddRoutes([]router.Route{
 		{
 			Method: http.MethodPost,
-			Path: "/v1.0/user/info",
+			Path: "/v1.0/sayHello",
 			Handler: demo.HelloWorld(ctx),
 		},
 	})

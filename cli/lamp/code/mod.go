@@ -10,7 +10,7 @@ var modTemplate = `module {{.Module}}
 go 1.16
 
 require (
-	github.com/seepre/go-lamp v1.0
+	github.com/seepre/go-lamp latest
 )`
 
 type Mod struct {
