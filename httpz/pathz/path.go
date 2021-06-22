@@ -83,9 +83,9 @@ func (p *Path) addNode(root *node, val string) (*node, bool) {
 }
 
 
-func (p *Path) ParsePath(method, path string) (http.Handler, map[string]interface{}, error) {
+func (p *Path) ParsePath(method, path string) (http.Handler, map[string]string, error) {
 	var (
-		respMap = make(map[string]interface{})
+		respMap = make(map[string]string)
 	)
 	if _, ok := p.methodRoot[method]; !ok {
 		return nil, nil, NotFound
