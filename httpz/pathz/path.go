@@ -108,9 +108,16 @@ func (p *Path) ParsePath(method, path string) (http.Handler, map[string]string, 
 	q := make([]*node, 0)
 	q = append(q, p.methodRoot[method])
 	idx := 0
-	for len(q) != 0 && idx <= len(pathItems) {
-		curNode := q[len(q) - 1]
-		q = q[:len(q)-1]
+
+	pathMap := make(map[*node]*node)
+	for len(q) != 0 {
+		curNode := q[0]
+
+		if len(q) == 1 {
+			q = q[0:0]
+		} else {
+			q = q[1:]
+		}
 
 		r = append(r, curNode)
 		if idx == len(pathItems) && curNode.handle != nil {
@@ -126,6 +133,7 @@ func (p *Path) ParsePath(method, path string) (http.Handler, map[string]string, 
 		}
 
 		for _, n := range ns {
+			pathMap[n] = curNode
 			q = append(q, n)
 		}
 	}
