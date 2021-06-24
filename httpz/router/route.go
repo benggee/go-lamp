@@ -38,7 +38,7 @@ func (r *route) Handle(method, routePath string, handler http.Handler) error {
 }
 
 func (r *route) ServeHTTP(w http.ResponseWriter, re *http.Request) {
-	handle, paramMap, err := r.path.ParsePath(re.Method, re.URL.Path)
+	ret, err := r.path.ParsePath(re.Method, re.URL.Path)
 	if err != nil && err != pathz.NotFound {
 		http.Error(w, err.Error(), 500)
 		return
@@ -46,14 +46,12 @@ func (r *route) ServeHTTP(w http.ResponseWriter, re *http.Request) {
 	if err == pathz.NotFound {
 		http.NotFound(w, re)
 	}
-	if handle == nil {
+	if ret.Handle == nil {
 		http.NotFoundHandler()
 		return
 	}
 
-	re = context.WithRequestContext(re, paramMap)
-
-	handle.ServeHTTP(w, re)
+	ret.Handle.ServeHTTP(w, context.WithRequestContext(re, ret.Params))
 	return
 }
 

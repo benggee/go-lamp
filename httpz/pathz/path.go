@@ -12,6 +12,13 @@ var (
 )
 
 type (
+	innerResult struct {
+		key string
+		val string
+		named bool
+		found bool
+	}
+
 	node struct {
 		val string
 		handle http.Handler
@@ -20,6 +27,11 @@ type (
 
 	Path struct {
 		methodRoot map[string]*node    // method -> path
+	}
+
+	Result struct {
+		Handle http.Handler
+		Params map[string]string
 	}
 )
 
@@ -37,6 +49,11 @@ func NewPath() *Path {
 }
 
 func (p *Path) BuildPath(method, path string, handler http.Handler) error {
+	_ , err := p.ParsePath(method, path)
+	if err != NotFound {
+		log.Fatalf("the route rule is exists method:%s, path:%s", method, path)
+	}
+
 	pathItems := cleanPath(path)
 	if _, ok := p.methodRoot[method]; !ok {
 		p.methodRoot[method] = createNode(method)
@@ -83,88 +100,98 @@ func (p *Path) addNode(root *node, val string) (*node, bool) {
 }
 
 
-func (p *Path) ParsePath(method, path string) (http.Handler, map[string]string, error) {
+func (p *Path) next(n *node, path string, result *Result) bool {
+	if len(path) == 0 && n.handle != nil {
+		result.Handle = n.handle
+		return true
+	}
+
+	for i := range path {
+		if path[i] == '/' {
+			token := path[:i]
+			for _, child := range n.childs {
+				if r := match(child.val, token); r.found {
+					if p.next(child, path[i+1:], result) {
+						if r.named {
+							addResult(result, r.key, r.val)
+						}
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
+
+	for _, child := range n.childs {
+		r := match(child.val, path)
+		if r.found && child.handle != nil {
+			result.Handle = child.handle
+			if r.named {
+				addResult(result, r.key, r.val)
+			}
+			return true
+		}
+	}
+
+	return false
+}
+
+func addResult(result *Result, k, v string) {
+	if result.Params == nil {
+		result.Params = make(map[string]string)
+	}
+	result.Params[k] = v
+}
+
+
+func match(k, token string) innerResult {
+	if k[0] == ':' {
+		return innerResult{
+			key: k[1:],
+			val: token,
+			named: true,
+			found: true,
+		}
+	}
+
+	return innerResult{
+		found: k == token,
+	}
+}
+
+
+func (p *Path) ParsePath(method, path string) (Result, error) {
 	var (
-		respMap = make(map[string]string)
+		resp = Result{}
 	)
 	if _, ok := p.methodRoot[method]; !ok {
-		return nil, nil, NotFound
+		return resp, NotFound
 	}
 
 	pathItems := cleanPath(path)
-
 	// root path
 	if len(pathItems) == 0 {
 		if p.methodRoot[method].handle == nil {
-			return nil, respMap, NotFound
+			return resp, NotFound
 		}
-		return p.methodRoot[method].handle, respMap, nil
+		resp.Handle = p.methodRoot[method].handle
+		return resp, nil
 	}
 
-	// route stack
-	r := make([]*node, 0)
-
-	// loop stack
-	q := make([]*node, 0)
-	q = append(q, p.methodRoot[method])
-	idx := 0
-
-	pathMap := make(map[*node]*node)
-	for len(q) != 0 {
-		curNode := q[0]
-
-		if len(q) == 1 {
-			q = q[0:0]
-		} else {
-			q = q[1:]
-		}
-
-		r = append(r, curNode)
-		if idx == len(pathItems) && curNode.handle != nil {
-			break
-		}
-
-		ns := p.parseNode(curNode, pathItems[idx])
-		if len(ns) == 0 {
-			r = r[len(r)-1:]
-			idx--
-		} else {
-			idx++
-		}
-
-		for _, n := range ns {
-			pathMap[n] = curNode
-			q = append(q, n)
-		}
+	newPath := strings.Join(pathItems, "/")
+	if !p.next(p.methodRoot[method], newPath, &resp) {
+		return resp, NotFound
 	}
 
-	if len(r) == 0 || r[len(r)-1].handle == nil || len(r) - 1 != len(pathItems) {
-		return nil, respMap, NotFound
-	}
-
-	r = r[1:]
-
-	for i, v := range r {
-		if v.val[0] == ':' {
-			k := v.val[1:]
-			respMap[k] = pathItems[i]
-		}
-	}
-
-	return r[len(r)-1].handle, respMap, nil
+	return resp, nil
 }
 
 func (p *Path) parseNode(root *node, val string) []*node {
 	resp := make([]*node, 0)
-	for _, v := range root.childs {
-		if v.val == val && v.val[0] != ':' {
-			resp = append(resp, v)
-			break
-		}
-	}
 
 	for _, v := range root.childs {
-		if v.val[0] == ':' {
+		if v.val == val || v.val[0] == ':'{
 			resp = append(resp, v)
 		}
 	}
@@ -174,22 +201,46 @@ func (p *Path) parseNode(root *node, val string) []*node {
 
 
 func cleanPath(path string) []string {
-	ps := strings.Split(path, "?")
-	path = ps[0]
+	pathBytes := []byte(path)
 
-	if path[0] == '/' {
-		path = path[1:]
-	}
+	l := 0
+	pathLen := len(pathBytes)
+	isFirst := true
 
-	items := strings.Split(path, "/")
+	newPath := make([]byte, 0)
+	for l < pathLen {
+		if pathBytes[l] == '?' {
+			break
+		}
 
-	pathItems := make([]string, 0)
-	for _, v := range items {
-		if len(v) == 0 {
+		r := l + 1
+		if r >= pathLen {
+			r = pathLen - 1
+		}
+
+		if pathBytes[l] == pathBytes[r] && pathBytes[l] == '/' {
+			l++
 			continue
 		}
-		pathItems = append(pathItems, v)
+
+		if isFirst && pathBytes[l] == '/' {
+			l++
+			continue
+		}
+
+		newPath = append(newPath, pathBytes[l])
+		isFirst = false
+		l++
 	}
 
-	return pathItems
+	if len(newPath) == 0 {
+		return []string{}
+	}
+
+	if newPath[len(newPath)-1] == '/' {
+		newPath = newPath[:len(newPath)-1]
+	}
+
+	tmpPath := string(newPath)
+	return strings.Split(tmpPath, "/")
 }
