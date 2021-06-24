@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/seepre/go-lamp/httpz/handler"
-	"github.com/seepre/go-lamp/httpz/middleware"
+	"github.com/seepre/go-lamp/httpz/internal/middleware"
 	"github.com/seepre/go-lamp/httpz/router"
 )
 
