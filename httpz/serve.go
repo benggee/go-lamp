@@ -49,7 +49,7 @@ func NewServe(c HttpConf, opts ...RunOption) (*Serve, error) {
 	return serve, nil
 }
 
-func (s *Serve) AddRoutes(rs []router.Route, opts ...RouteOption) {
+func (s *Serve) AddRoutes(rs []router.Route, opts ...RouteOption) *Serve {
 	r := router.Routers{
 		Routes: rs,
 	}
@@ -58,14 +58,22 @@ func (s *Serve) AddRoutes(rs []router.Route, opts ...RouteOption) {
 		opt(&r)
 	}
 	s.engine.AddRoute(r)
+	return s
 }
 
-func (s *Serve) AddRoute(r router.Route, opts ...RouteOption) {
+func (s *Serve) AddRoute(r router.Route, opts ...RouteOption) *Serve {
 	s.AddRoutes([]router.Route{r}, opts...)
+	return s
 }
 
-func (s *Serve) UseMiddleware(middleware Middleware) {
-	s.engine.useMiddleware(middleware)
+func (s *Serve) WithMiddleware(middleware Middleware) {
+	s.engine.withMiddleware(middleware)
+}
+
+func (s *Serve) WithMiddlewares(middlewares  ...Middleware) {
+	for _, m := range middlewares {
+		s.WithMiddleware(m)
+	}
 }
 
 func (s *Serve) Run() {
@@ -76,45 +84,9 @@ func (s *Serve) Stop() {
 	// TODO something
 }
 
-func WithNotAllowedHandler(handler http.Handler) RunOption {
-	rt := router.NewRouter()
-	return WithRouter(rt)
-}
-
-func WithRouter(router router.Router) RunOption {
-	return func(serve *Serve) {
-		serve.opts.start = func(e *engine) error {
-			return e.WithRouter(router)
-		}
-	}
-}
-
 func handlerError(err error) {
 	if err == nil || err == http.ErrServerClosed {
 		return
 	}
 	panic(err)
-}
-
-func WithMiddleware(middleware Middleware, rt ...router.Route) []router.Route {
-	routes := make([]router.Route, len(rt))
-
-	for i := range rt {
-		route := rt[i]
-		routes[i] = router.Route{
-			Method:  route.Method,
-			Path:    route.Path,
-			Handler: middleware(route.Handler),
-		}
-	}
-
-	return routes
-}
-
-func WithMiddlewares(ms []Middleware, rt ...router.Route) []router.Route {
-	for i := len(ms) - 1; i >= 0; i-- {
-		rt = WithMiddleware(ms[i], rt...)
-	}
-
-	return rt
 }

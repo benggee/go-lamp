@@ -63,7 +63,7 @@ func (e *engine) bindRoute(router router.Router, route router.Route) error {
 	return router.Handle(route.Method, route.Path, handle)
 }
 
-func (e *engine) useMiddleware(middleware Middleware) {
+func (e *engine) withMiddleware(middleware Middleware) {
 	e.middlewares = append(e.middlewares, middleware)
 }
 
