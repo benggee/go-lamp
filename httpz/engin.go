@@ -37,7 +37,7 @@ func (e *engine) WithRouter(router router.Router) error {
 	if err := e.bindRoutes(router); err != nil {
 		return err
 	}
-	return Start(e.conf.Addr, router)
+	return Start(e.conf, router)
 }
 
 func (e *engine) bindRoutes(router router.Router) error {
@@ -67,15 +67,29 @@ func (e *engine) withMiddleware(middleware Middleware) {
 	e.middlewares = append(e.middlewares, middleware)
 }
 
-func Start(addr string, handle http.Handler) error {
-	return start(addr, handle, func(srv *http.Server) error {
+func Start(c HttpConf, handle http.Handler) error {
+	if len(c.CertFile) == 0 {
+		return startHttp(c, handle)
+	}
+
+	return startHttps(c, handle)
+}
+
+func startHttp(c HttpConf, handle http.Handler) error {
+	return start(c, handle, func(srv *http.Server) error {
 		return srv.ListenAndServe()
 	})
 }
 
-func start(addr string, handle http.Handler, run func(srv *http.Server) error) error {
+func startHttps(c HttpConf, handle http.Handler) error {
+	return start(c, handle, func(srv *http.Server) error {
+		return srv.ListenAndServeTLS(c.CertFile, c.KeyFile)
+	})
+}
+
+func start(c HttpConf, handle http.Handler, run func(srv *http.Server) error) error {
 	server := &http.Server{
-		Addr:    addr,
+		Addr:    c.Addr,
 		Handler: handle,
 	}
 

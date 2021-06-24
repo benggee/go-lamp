@@ -6,6 +6,8 @@ type (
 	HttpConf struct {
 		Addr    string
 		Timeout int64 `json:",default=5000"`
+		CertFile string
+		KeyFile string
 	}
 
 	SignatureConf struct {
